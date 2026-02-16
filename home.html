@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trang Chủ - Chấm Công</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+</head>
+<body>
+
+<div class="app">
+
+    <div class="header">
+        <div class="user">
+            <div class="avatar"></div>
+            <div>
+                <div><strong>Lê Bạch Vân</strong></div>
+                <div id="today"></div>
+            </div>
+        </div>
+        <div class="status green">● Đã chấm công</div>
+    </div>
+
+    <div class="card">
+        <div class="time-row">
+            <div>Chấm vào</div>
+            <div><strong id="gioVao">--:--</strong></div>
+        </div>
+        <div class="time-row">
+            <div>Chấm ra</div>
+            <div id="gioRa">--:--</div>
+        </div>
+        <div class="total" id="tongGio"></div>
+    </div>
+
+    <div class="btn btn-red" onclick="chamCong()">CHẤM CÔNG</div>
+
+    <div class="map-section">
+        <div class="map-title">📍 Xác nhận vị trí hiện tại</div>
+        <div id="map" style="height:180px;border-radius:16px;"></div>
+        <div class="location-text" id="locationText">
+            Đang xác định vị trí...
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <div class="active" onclick="location.href='home.html'">Trang chủ</div>
+        <div onclick="location.href='history.html'">Lịch sử</div>
+        <div onclick="location.href='report.html'">Báo cáo</div>
+        <!-- <div>Cá nhân</div> -->
+    </div>
+</div>
+
+<script>
+const userId = null;
+// ========================
+// HIỂN THỊ NGÀY HÔM NAY
+// ========================
+  window.onload = function () { 
+
+       loadChamCong();
+       userId = localStorage.getItem("TaiKhoanId");
+
+    if(!userId){
+        window.location.href="index.html";
+    }
+
+}
+function getGioHienTai() {
+    const now = new Date();
+    return now.getHours().toString().padStart(2,'0') + ":" +
+           now.getMinutes().toString().padStart(2,'0');
+}
+document.getElementById("today").innerText =
+    new Date().toLocaleDateString("vi-VN", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
+
+// ========================
+// LEAFLET MAP
+// ========================
+
+let currentLat = null;
+let currentLng = null;
+
+function initLeafletMap(lat, lng) {
+
+    const map = L.map('map').setView([lat, lng], 16);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.marker([lat, lng]).addTo(map)
+        .bindPopup("Bạn đang ở đây")
+        .openPopup();
+}
+
+function getLocation() {
+
+    if (!navigator.geolocation) {
+        document.getElementById("locationText").innerHTML =
+            "Trình duyệt không hỗ trợ GPS.";
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+
+            currentLat = position.coords.latitude;
+            currentLng = position.coords.longitude;
+
+            initLeafletMap(currentLat, currentLng);
+
+            document.getElementById("locationText").innerHTML =
+                "Lat: " + currentLat.toFixed(5) +
+                " | Lng: " + currentLng.toFixed(5);
+        },
+        function() {
+            document.getElementById("locationText").innerHTML =
+                "Không thể lấy vị trí.";
+        },
+        { enableHighAccuracy: true }
+    );
+}
+
+getLocation();
+
+// ========================
+// MOCK API
+// ========================
+
+const Id = Math.random();
+function tinhSoGio(gioVao, gioRa) {
+
+    if (!gioVao || !gioRa) return 0;
+
+    const [vaoH, vaoM] = gioVao.split(":").map(Number);
+    const [raH, raM] = gioRa.split(":").map(Number);
+
+    let tongPhut = (raH * 60 + raM) - (vaoH * 60 + vaoM);
+
+    // Nếu làm qua ngày (vd 22:00 -> 06:00)
+    if (tongPhut < 0) {
+        tongPhut += 24 * 60;
+    }
+
+    const gio = Math.floor(tongPhut / 60);
+    const phut = tongPhut % 60;
+
+    // Hiển thị UI
+    document.getElementById("tongGio").innerText =
+        `Tổng giờ: ${gio}h ${phut}p`;
+
+    return {
+        gio,
+        phut,
+        tongPhut
+    };
+}
+
+
+function getHomNay() {
+    const today = new Date();
+    today.setDate(today.getDate() + 2); // +1 ngày
+    return today.toISOString().split("T")[0];
+}
+async function chamCong() {
+
+    const homNay = getHomNay();
+    const gioHienTai = getGioHienTai();
+
+    const now = new Date();
+    const nam = now.getFullYear();
+    const thang = String(now.getMonth() + 1).padStart(2, "0");
+    const thangNam = `${nam}-${thang}`;
+   
+    try {
+
+        // =========================
+        // 1️⃣ LẤY TOÀN BỘ DANH SÁCH
+        // =========================
+
+        let res = await fetch(BASE_URL);
+        let allData = await res.json();
+
+        // Tìm tháng hiện tại
+        let record = allData.find(x => x.Thang === thangNam);
+
+        // =========================
+        // 2️⃣ NẾU CHƯA CÓ THÁNG → TẠO MỚI
+        // =========================
+
+        if (!record) {
+
+            const createRes = await fetch(BASE_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    Thang: thangNam,
+                    GioVao_GioRa_Thang: []
+                })
+            });
+
+            record = await createRes.json();
+        }
+
+        let danhSachThang = Array.isArray(record.GioVao_GioRa_Thang)
+            ? record.GioVao_GioRa_Thang
+            : [];
+
+        // =========================
+        // 3️⃣ XỬ LÝ NGÀY
+        // =========================
+
+        let ngay = danhSachThang.find(x => x.idNgay === homNay);
+        
+        if (!ngay) {
+
+            // CHECK IN
+            danhSachThang.push({
+                idNgay: homNay,
+                GioVao: gioHienTai,
+                GioRa: null,
+                IsTangCa: false,
+                SoTieng_TrongNgay: 0
+            });
+
+            document.getElementById("gioVao").innerText = gioHienTai;
+
+        }
+        else if (!ngay.GioRa) {
+            const soGio  = getHomNay(ngay.GioVao ?? null ,ngay.GioRa ?? null);
+            // CHECK OUT
+            ngay.GioRa = gioHienTai;
+            ngay.SoTieng_TrongNgay = Number(soGio);
+            ngay.IsTangCa = soGio > 8;
+            ngay.SoTieng_TrongNgay = tinhSoGio(ngay.GioVao,ngay.GioRa);
+        }
+        else
+        {
+            const soGio  = getHomNay(ngay.GioVao ?? null ,ngay.GioRa ?? null);
+              // CHECK OUT
+            ngay.GioRa = gioHienTai;
+            ngay.SoTieng_TrongNgay = Number(soGio);
+            ngay.IsTangCa = soGio > 8;
+            ngay.SoTieng_TrongNgay = tinhSoGio(ngay.GioVao,ngay.GioRa);
+        }
+        // =========================
+        // 4️⃣ UPDATE LẠI THEO ID THẬT
+        // =========================
+
+        await fetch(`${BASE_URL}/${record.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                ...record,
+                GioVao_GioRa_Thang: danhSachThang
+            })
+        });
+
+        alert("Lưu thành công ✅");
+        loadChamCong();
+
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi hệ thống ❌");
+    }
+}
+
+function getThangNamHienTai() {
+    const now = new Date();
+    const nam = now.getFullYear();
+    const thang = String(now.getMonth() + 1).padStart(2, "0");
+    return `${nam}-${thang}`;
+}
+async function loadChamCong() {
+
+    const thangNam = getThangNamHienTai();
+    const homNay = getHomNay();
+
+    try {
+
+        const res = await fetch(BASE_URL);
+        const data = await res.json();
+
+        const record = data.find(x => x.Thang === thangNam);
+
+        if (!record) return;
+
+        const ngay = record.GioVao_GioRa_Thang
+            ?.find(x => x.idNgay === homNay);
+
+        // Hiển thị ngày hôm nay
+        document.getElementById("today").innerText = homNay;
+
+        if (!ngay) {
+            // Chưa chấm công
+            document.getElementById("gioVao").innerText = "--:--";
+            document.getElementById("gioRa").innerText = "--:--";
+            document.getElementById("tongGio").innerText = "Tổng giờ: 0h";
+
+            setStatus(false);
+            return;
+        }
+
+        // Có dữ liệu
+        document.getElementById("gioVao").innerText =
+            ngay.GioVao ?? "--:--";
+
+        document.getElementById("gioRa").innerText =
+            ngay.GioRa ?? "--:--";
+
+        document.getElementById("tongGio").innerText =
+            "Tổng giờ: " + (ngay.SoTieng_TrongNgay.gio ?? 0) + " giờ " + (ngay.SoTieng_TrongNgay.phut ?? 0) + " phút ";
+
+        // Nếu đã có giờ ra => đã chấm công
+        setStatus(!!ngay.GioRa);
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+function setStatus(isDone) {
+
+    const statusDiv = document.querySelector(".status");
+
+    if (isDone) {
+        statusDiv.classList.remove("red");
+        statusDiv.classList.add("green");
+        statusDiv.innerHTML = "● Đã chấm công";
+    } else {
+        statusDiv.classList.remove("green");
+        statusDiv.classList.add("red");
+        statusDiv.innerHTML = "● Chưa chấm công";
+    }
+}
+
+</script>
+<script src="./appsetting.js"></script>
+</body>
+</html>

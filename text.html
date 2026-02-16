@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Quản lý chấm công</title>
+  <style>
+    body { font-family: Arial; padding:20px }
+    input { padding:6px; margin:4px }
+    button { padding:6px 10px; margin:4px }
+    li { margin:6px 0 }
+  </style>
+</head>
+<body>
+
+<h2>Danh sách tháng</h2>
+
+<input type="text" id="thangInput" placeholder="Nhập Tháng (VD: Tháng 3)">
+<button onclick="addData()">Thêm</button>
+<button onclick="downloadJSON()">Download JSON</button>
+
+<ul id="list"></ul>
+
+<script>
+const API = "https://68fe3dce7c700772bb133e1d.mockapi.io/api/v1/CHAMCONG/CHAMCONG";
+
+function loadData() {
+  fetch(API)
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+      data.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          ${item.Thang}
+          <button onclick="editData('${item.id}','${item.Thang}')">Sửa</button>
+          <button onclick="deleteData('${item.id}')">Xóa</button>
+        `;
+        list.appendChild(li);
+      });
+    });
+}
+
+function addData() {
+  const thang = document.getElementById("thangInput").value;
+  if(!thang) return alert("Nhập tháng!");
+
+  fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Thang: thang,
+      GioVao_GioRa_Thang: []
+    })
+  })
+  .then(() => {
+    document.getElementById("thangInput").value = "";
+    loadData();
+  });
+}
+
+function editData(id, oldThang) {
+  const newThang = prompt("Sửa tháng:", oldThang);
+  if(!newThang) return;
+
+  fetch(API + "/" + id, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Thang: newThang
+    })
+  })
+  .then(() => loadData());
+}
+
+function deleteData(id) {
+  if(!confirm("Xóa tháng này?")) return;
+
+  fetch(API + "/" + id, {
+    method: "DELETE"
+  })
+  .then(() => loadData());
+}
+
+function downloadJSON() {
+  fetch(API)
+    .then(res => res.json())
+    .then(data => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "chamcong.json";
+      a.click();
+    });
+}
+
+loadData();
+</script>
+
+</body>
+</html>

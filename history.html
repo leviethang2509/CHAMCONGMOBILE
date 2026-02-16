@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lịch Sử Chấm Công</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+    <div class="header">
+        <h2>Lịch Sử Chấm Công</h2>
+    </div>
+
+    <!-- THÊM id -->
+    <div class="history" id="historyList"></div>
+
+    <div class="bottom-nav">
+        <div class="active" onclick="location.href='home.html'">Trang chủ</div>
+        <div onclick="location.href='history.html'">Lịch sử</div>
+        <div onclick="location.href='report.html'">Báo cáo</div>
+        <!-- <div>Cá nhân</div> -->
+    </div>
+
+</div>
+
+<script src="./appsetting.js"></script>
+
+<script>
+const GIO_CHUAN_MOT_CONG = 8;
+const PHUT_MOT_CONG = GIO_CHUAN_MOT_CONG * 60;
+
+function tinhSoPhut(gioVao, gioRa) {
+
+    if (!gioVao || !gioRa) return 0;
+
+    const [vaoH, vaoM] = gioVao.split(":").map(Number);
+    const [raH, raM] = gioRa.split(":").map(Number);
+
+    let vaoTong = vaoH * 60 + vaoM;
+    let raTong = raH * 60 + raM;
+
+    if (raTong < vaoTong) {
+        raTong += 24 * 60;
+    }
+
+    return raTong - vaoTong;
+}
+
+function tinhCong(tongPhut) {
+    return tongPhut / PHUT_MOT_CONG;
+}
+
+function formatGioPhut(tongPhut) {
+    const gio = Math.floor(tongPhut / 60);
+    const phut = tongPhut % 60;
+    return `${gio} giờ ${phut} phút`;
+}
+
+async function loadChamCong() {
+
+    const thangNam = getThangNamHienTai();
+    const container = document.getElementById("historyList");
+    container.innerHTML = "";
+
+    try {
+
+        const res = await fetch(BASE_URL);
+        const data = await res.json();
+
+        const record = data.find(x => x.Thang === thangNam);
+        if (!record || !record.GioVao_GioRa_Thang) return;
+
+       const homNay = new Date().toISOString().split("T")[0];
+
+const ngayHomNay = record.GioVao_GioRa_Thang.find(
+    x => x.idNgay === homNay
+);
+
+        if (!ngayHomNay) {
+            container.innerHTML = "<p>Hôm nay chưa có dữ liệu</p>";
+            return;
+        }
+
+        const gioVao = ngayHomNay.GioVao ?? "--:--";
+        const gioRa = ngayHomNay.GioRa ?? "--:--";
+
+        const tongPhut = tinhSoPhut(ngayHomNay.GioVao, ngayHomNay.GioRa);
+        const gio = Math.floor(tongPhut / 60);
+        const phut = tongPhut % 60;
+
+        let tagClass = "green";
+        let tagText = "● Đủ công";
+
+        if (!ngayHomNay.GioRa) {
+            tagClass = "red";
+            tagText = "● Quên check-out";
+        }
+        else if (gio < 8) {
+            tagClass = "yellow";
+            tagText = "● Thiếu giờ";
+        }
+
+        const card = `
+            <div class="history-card">
+                <div><strong>${formatDateVN(ngayHomNay.idNgay)}</strong></div>
+                <div>Check-in: ${gioVao}</div>
+                <div>Check-out: ${gioRa}</div>
+                <div>Tổng: ${gio}h ${phut}m</div>
+                <div class="tag ${tagClass}">${tagText}</div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML("beforeend", card);
+
+
+    } catch (err) {
+        console.error("Lỗi tải dữ liệu:", err);
+        container.innerHTML = "<p>Lỗi tải dữ liệu</p>";
+    }
+}
+
+function formatDateVN(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("vi-VN");
+}
+
+function getThangNamHienTai() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+document.addEventListener("DOMContentLoaded", loadChamCong);
+
+</script>
+
+</body>
+</html>

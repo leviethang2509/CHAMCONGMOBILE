@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Attendance System</title>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:url('./pictures/bg.png') no-repeat center center/cover;
+    position:relative;
+    overflow:hidden;
+}
+
+/* Overlay */
+body::after{
+    content:"";
+    position:absolute;
+    width:100%;
+    height:100%;
+    background:linear-gradient(135deg,rgba(0,0,0,0.6),rgba(30,60,114,0.7));
+    z-index:0;
+}
+
+/* Glass Card */
+.card{
+    position:relative;
+    z-index:2;
+    width:92%;
+    max-width:420px;
+    padding:40px 30px;
+    border-radius:28px;
+    backdrop-filter:blur(35px);
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);
+    box-shadow:0 30px 60px rgba(0,0,0,0.5);
+    color:white;
+}
+
+.card h2{
+    text-align:center;
+    font-size:24px;
+    margin-bottom:10px;
+}
+
+.subtitle{
+    text-align:center;
+    font-size:13px;
+    opacity:0.8;
+    margin-bottom:25px;
+}
+
+.input-group{
+    margin-bottom:18px;
+}
+
+input{
+    width:100%;
+    padding:14px 16px;
+    border-radius:14px;
+    border:none;
+    outline:none;
+    background:rgba(255,255,255,0.2);
+    color:white;
+}
+
+input::placeholder{
+    color:#eee;
+}
+
+button{
+    width:100%;
+    padding:14px;
+    border-radius:14px;
+    border:none;
+    margin-top:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+.primary{
+    background:linear-gradient(135deg,#00c6ff,#0072ff);
+    color:white;
+}
+
+.primary:hover{
+    transform:translateY(-2px);
+}
+
+.secondary{
+    background:rgba(255,255,255,0.2);
+    color:white;
+}
+
+.switch{
+    text-align:center;
+    margin-top:20px;
+    font-size:14px;
+    cursor:pointer;
+    opacity:0.8;
+}
+
+.message{
+    text-align:center;
+    margin-top:15px;
+    font-weight:600;
+}
+
+.success{color:#00ff9d;}
+.error{color:#ff6b6b;}
+.hidden{display:none;}
+
+/* FACE POPUP */
+#facePopup{
+    position:fixed;
+    top:0;left:0;
+    width:100%;
+    height:100%;
+    background:linear-gradient(135deg,#000,#1e3c72);
+    display:none;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+}
+
+#facePopup video{
+    width:90%;
+    max-width:450px;
+    border-radius:20px;
+}
+
+#closeBtn{
+    position:absolute;
+    top:20px;
+    right:20px;
+    background:#ff4b5c;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:10px;
+    cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h2 id="formTitle">Đăng nhập</h2>
+<div class="subtitle">AI Face Recognition Attendance</div>
+
+<div class="input-group">
+<input type="text" id="hoten" placeholder="Họ tên (khi đăng ký)" class="hidden">
+</div>
+
+<div class="input-group">
+<input type="text" id="taikhoan" placeholder="Tài khoản">
+</div>
+
+<div class="input-group">
+<input type="password" id="matkhau" placeholder="Mật khẩu">
+</div>
+
+<button class="primary" onclick="submitForm()">Xác nhận</button>
+<button class="secondary" onclick="loginFace()">Đăng nhập bằng khuôn mặt</button>
+
+<div class="switch" onclick="toggleMode()">
+Chưa có tài khoản? Đăng ký
+</div>
+
+<div id="message" class="message"></div>
+</div>
+
+<!-- FACE POPUP -->
+<div id="facePopup">
+<button id="closeBtn" onclick="closeFacePopup()">✕</button>
+<video id="faceVideo" autoplay muted></video>
+</div>
+<script src="./appsetting.js"></script>
+<script>
+const MODEL_URL = "./models";
+const API_URL = BASE_URL_TAIKHOAN;
+
+let isLogin = true;
+let stream = null;
+
+async function loadModels(){
+    await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]);
+}
+
+async function openFacePopup(){
+    document.getElementById("facePopup").style.display="flex";
+    await loadModels();
+    stream = await navigator.mediaDevices.getUserMedia({video:true});
+    document.getElementById("faceVideo").srcObject = stream;
+}
+
+function closeFacePopup(){
+    document.getElementById("facePopup").style.display="none";
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+}
+
+async function captureDescriptor(){
+    const video = document.getElementById("faceVideo");
+    const detection = await faceapi
+        .detectSingleFace(video,new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+    return detection ? detection.descriptor : null;
+}
+
+function toggleMode(){
+    isLogin=!isLogin;
+    document.getElementById("formTitle").innerText =
+        isLogin?"Đăng nhập":"Đăng ký";
+    document.getElementById("hoten").classList.toggle("hidden");
+    document.querySelector(".switch").innerText =
+        isLogin?"Chưa có tài khoản? Đăng ký":"Đã có tài khoản? Đăng nhập";
+    document.getElementById("message").innerText="";
+}
+
+async function submitForm(){
+    const hoten = document.getElementById("hoten").value;
+    const taikhoan = document.getElementById("taikhoan").value;
+    const matkhau = document.getElementById("matkhau").value;
+    const msg = document.getElementById("message");
+
+    if(!taikhoan || !matkhau){
+        msg.innerText="Nhập đầy đủ thông tin!";
+        msg.className="message error";
+        return;
+    }
+
+    const res = await fetch(API_URL);
+    const users = await res.json();
+
+    if(isLogin){
+        const user = users.find(u=>u.TaiKhoan===taikhoan && u.MatKhau===matkhau);
+        if(!user){
+            msg.innerText="Sai tài khoản hoặc mật khẩu!";
+            msg.className="message error";
+            return;
+        }
+
+        await openFacePopup();
+        setTimeout(async()=>{
+            const descriptor = await captureDescriptor();
+            closeFacePopup();
+
+            if(!descriptor) return;
+
+            const saved = new Float32Array(JSON.parse(user.VectorKhuonMat));
+            const distance = faceapi.euclideanDistance(descriptor,saved);
+
+            if(distance<0.5){
+                msg.innerText="Đăng nhập thành công!";
+                msg.className="message success";
+                
+                setTimeout(()=>window.location.href="dashboard.html",1500);
+            }else{
+                msg.innerText="Sai khuôn mặt!";
+                msg.className="message error";
+            }
+        },2500);
+
+    }else{
+        if(!hoten){
+            msg.innerText="Nhập họ tên!";
+            msg.className="message error";
+            return;
+        }
+
+        await openFacePopup();
+        setTimeout(async()=>{
+            const descriptor = await captureDescriptor();
+            closeFacePopup();
+
+            if(!descriptor) return;
+
+            const newUser={
+                HoTen:hoten,
+                TaiKhoan:taikhoan,
+                MatKhau:matkhau,
+                AnhDaiDien:"",
+                VectorKhuonMat:JSON.stringify(Array.from(descriptor))
+            };
+
+            await fetch(API_URL,{
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify(newUser)
+            });
+
+            msg.innerText="Đăng ký thành công!";
+            msg.className="message success";
+        },2500);
+    }
+}
+
+async function loginFace(){
+    const msg = document.getElementById("message");
+    const res = await fetch(API_URL);
+    const users = await res.json();
+
+    await openFacePopup();
+
+    setTimeout(async()=>{
+        const descriptor = await captureDescriptor();
+        closeFacePopup();
+
+        if(!descriptor) return;
+
+        for(let user of users){
+            try{
+                const saved = new Float32Array(JSON.parse(user.VectorKhuonMat));
+                const distance = faceapi.euclideanDistance(descriptor,saved);
+                if(distance<0.5){
+                    msg.innerText="Xin chào "+user.HoTen;
+                    msg.className="message success";
+                    setTimeout(()=>window.location.href="home.html",1500);
+                    return;
+                }
+            }catch{}
+        }
+
+        msg.innerText="Không nhận diện được!";
+        msg.className="message error";
+    },2500);
+}
+</script>
+
+</body>
+</html>
