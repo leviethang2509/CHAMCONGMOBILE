@@ -238,6 +238,23 @@ function toggleMode(){
         isLogin?"Chưa có tài khoản? Đăng ký":"Đã có tài khoản? Đăng nhập";
     document.getElementById("message").innerText="";
 }
+async function detectFaceLoop(){
+    const video = document.getElementById("faceVideo");
+
+    return new Promise(resolve=>{
+        const interval = setInterval(async()=>{
+            const detection = await faceapi
+                .detectSingleFace(video,new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if(detection){
+                clearInterval(interval);
+                resolve(detection.descriptor);
+            }
+        },500);
+    });
+}
 
 async function submitForm(){
     const hoten = document.getElementById("hoten").value;
@@ -262,26 +279,14 @@ async function submitForm(){
             return;
         }
 
-        await openFacePopup();
-        setTimeout(async()=>{
-            const descriptor = await captureDescriptor();
-            closeFacePopup();
+       await openFacePopup();
 
-            if(!descriptor) return;
+        const descriptor = await detectFaceLoop();
 
-            const saved = new Float32Array(JSON.parse(user.VectorKhuonMat));
-            const distance = faceapi.euclideanDistance(descriptor,saved);
+        closeFacePopup(); // luôn đóng
 
-            if(distance<0.5){
-                msg.innerText="Đăng nhập thành công!";
-                msg.className="message success";
-                
-                setTimeout(()=>window.location.href="dashboard.html",1500);
-            }else{
-                msg.innerText="Sai khuôn mặt!";
-                msg.className="message error";
-            }
-        },2500);
+        if(!descriptor) return;
+
 
     }else{
         if(!hoten){
