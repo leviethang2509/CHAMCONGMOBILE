@@ -195,7 +195,7 @@ Chưa có tài khoản? Đăng ký
 <script src="./appsetting.js"></script>
 <script>
 const MODEL_URL = "./models";
-const API_URL = BASE_URL_TAIKHOAN;
+const API_URL = BASE_URL;
 
 let isLogin = true;
 let stream = null;
@@ -325,7 +325,9 @@ async function submitForm(){
 async function loginFace(){
     const msg = document.getElementById("message");
     const res = await fetch(API_URL);
-    const users = await res.json();
+    const data = await res.json();
+    const users = data.results;
+
 
     await openFacePopup();
 
