@@ -1,360 +1,369 @@
 <!DOCTYPE html>
 <html lang="vi">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+
+
 <head>
+<style>
+    .avatar {
+    width: 60px;
+    height: 60px;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-size: 28px;
+}
+
+</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smart Attendance System</title>
+<title>Trang Chủ - Chấm Công</title>
 
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 
-<style>
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:'Poppins',sans-serif;
-}
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-body{
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background:url('./pictures/bg.png') no-repeat center center/cover;
-    position:relative;
-    overflow:hidden;
-}
-
-/* Overlay */
-body::after{
-    content:"";
-    position:absolute;
-    width:100%;
-    height:100%;
-    background:linear-gradient(135deg,rgba(0,0,0,0.6),rgba(30,60,114,0.7));
-    z-index:0;
-}
-
-/* Glass Card */
-.card{
-    position:relative;
-    z-index:2;
-    width:92%;
-    max-width:420px;
-    padding:40px 30px;
-    border-radius:28px;
-    backdrop-filter:blur(35px);
-    background:rgba(255,255,255,0.12);
-    border:1px solid rgba(255,255,255,0.25);
-    box-shadow:0 30px 60px rgba(0,0,0,0.5);
-    color:white;
-}
-
-.card h2{
-    text-align:center;
-    font-size:24px;
-    margin-bottom:10px;
-}
-
-.subtitle{
-    text-align:center;
-    font-size:13px;
-    opacity:0.8;
-    margin-bottom:25px;
-}
-
-.input-group{
-    margin-bottom:18px;
-}
-
-input{
-    width:100%;
-    padding:14px 16px;
-    border-radius:14px;
-    border:none;
-    outline:none;
-    background:rgba(255,255,255,0.2);
-    color:white;
-}
-
-input::placeholder{
-    color:#eee;
-}
-
-button{
-    width:100%;
-    padding:14px;
-    border-radius:14px;
-    border:none;
-    margin-top:12px;
-    font-weight:600;
-    cursor:pointer;
-    transition:0.3s;
-}
-
-.primary{
-    background:linear-gradient(135deg,#00c6ff,#0072ff);
-    color:white;
-}
-
-.primary:hover{
-    transform:translateY(-2px);
-}
-
-.secondary{
-    background:rgba(255,255,255,0.2);
-    color:white;
-}
-
-.switch{
-    text-align:center;
-    margin-top:20px;
-    font-size:14px;
-    cursor:pointer;
-    opacity:0.8;
-}
-
-.message{
-    text-align:center;
-    margin-top:15px;
-    font-weight:600;
-}
-
-.success{color:#00ff9d;}
-.error{color:#ff6b6b;}
-.hidden{display:none;}
-
-/* FACE POPUP */
-#facePopup{
-    position:fixed;
-    top:0;left:0;
-    width:100%;
-    height:100%;
-    background:linear-gradient(135deg,#000,#1e3c72);
-    display:none;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    z-index:9999;
-}
-
-#facePopup video{
-    width:90%;
-    max-width:450px;
-    border-radius:20px;
-}
-
-#closeBtn{
-    position:absolute;
-    top:20px;
-    right:20px;
-    background:#ff4b5c;
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:10px;
-    cursor:pointer;
-}
-</style>
 </head>
-
 <body>
 
-<div class="card">
-<h2 id="formTitle">Đăng nhập</h2>
-<div class="subtitle">AI Face Recognition Attendance</div>
+<div class="app">
 
-<div class="input-group">
-<input type="text" id="hoten" placeholder="Họ tên (khi đăng ký)" class="hidden">
+    <div class="header">
+        <div class="user">
+            <div class="avatar icon d-flex justify-content-center align-items-center">
+                <i class="bi bi-person"></i>
+
+            </div>
+            <div>
+                <div><strong>Lê Bạch Vân</strong></div>
+                <div id="today"></div>
+            </div>
+        </div>
+        <div class="status green">● Đã chấm công</div>
+    </div>
+
+    <div class="card">
+        <div class="time-row">
+            <div>Chấm vào</div>
+            <div><strong id="gioVao">--:--</strong></div>
+        </div>
+        <div class="time-row">
+            <div>Chấm ra</div>
+            <div id="gioRa">--:--</div>
+        </div>
+        <div class="total" id="tongGio"></div>
+    </div>
+
+    <div class="btn btn-red" onclick="chamCong()">CHẤM CÔNG</div>
+
+    <div class="map-section">
+        <div class="map-title">📍 Xác nhận vị trí hiện tại</div>
+        <div id="map" style="height:180px;border-radius:16px;"></div>
+        <div class="location-text" id="locationText">
+            Đang xác định vị trí...
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <div class="active" onclick="location.href='home.html'">Trang chủ</div>
+        <div onclick="location.href='history.html'">Lịch sử</div>
+        <div onclick="location.href='report.html'">Báo cáo</div>
+        <!-- <div>Cá nhân</div> -->
+    </div>
 </div>
 
-<div class="input-group">
-<input type="text" id="taikhoan" placeholder="Tài khoản">
-</div>
-
-<div class="input-group">
-<input type="password" id="matkhau" placeholder="Mật khẩu">
-</div>
-
-<button class="primary" onclick="submitForm()">Xác nhận</button>
-<button class="secondary" onclick="loginFace()">Đăng nhập bằng khuôn mặt</button>
-
-<div class="switch" onclick="toggleMode()">
-Chưa có tài khoản? Đăng ký
-</div>
-
-<div id="message" class="message"></div>
-</div>
-
-<!-- FACE POPUP -->
-<div id="facePopup">
-<button id="closeBtn" onclick="closeFacePopup()">✕</button>
-<video id="faceVideo" autoplay muted></video>
-</div>
-<script src="./appsetting.js"></script>
 <script>
-const MODEL_URL = "./models";
-const API_URL = BASE_URL;
+const userId = null;
+// ========================
+// HIỂN THỊ NGÀY HÔM NAY
+// ========================
+  window.onload = function () { 
 
-let isLogin = true;
-let stream = null;
+       loadChamCong();
+       userId = localStorage.getItem("TaiKhoanId");
 
-async function loadModels(){
-    await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-    ]);
+    if(!userId){
+        window.location.href="index.html";
+    }
+
 }
-
-async function openFacePopup(){
-    document.getElementById("facePopup").style.display="flex";
-    await loadModels();
-    stream = await navigator.mediaDevices.getUserMedia({video:true});
-    document.getElementById("faceVideo").srcObject = stream;
+function getGioHienTai() {
+    const now = new Date();
+    return now.getHours().toString().padStart(2,'0') + ":" +
+           now.getMinutes().toString().padStart(2,'0');
 }
-
-function closeFacePopup(){
-    document.getElementById("facePopup").style.display="none";
-    if(stream) stream.getTracks().forEach(t=>t.stop());
-}
-
-async function captureDescriptor(){
-    const video = document.getElementById("faceVideo");
-    const detection = await faceapi
-        .detectSingleFace(video,new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-    return detection ? detection.descriptor : null;
-}
-
-function toggleMode(){
-    isLogin=!isLogin;
-    document.getElementById("formTitle").innerText =
-        isLogin?"Đăng nhập":"Đăng ký";
-    document.getElementById("hoten").classList.toggle("hidden");
-    document.querySelector(".switch").innerText =
-        isLogin?"Chưa có tài khoản? Đăng ký":"Đã có tài khoản? Đăng nhập";
-    document.getElementById("message").innerText="";
-}
-async function detectFaceLoop(){
-    const video = document.getElementById("faceVideo");
-
-    return new Promise(resolve=>{
-        const interval = setInterval(async()=>{
-            const detection = await faceapi
-                .detectSingleFace(video,new faceapi.TinyFaceDetectorOptions())
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-
-            if(detection){
-                clearInterval(interval);
-                resolve(detection.descriptor);
-            }
-        },500);
+document.getElementById("today").innerText =
+    new Date().toLocaleDateString("vi-VN", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
     });
+
+// ========================
+// LEAFLET MAP
+// ========================
+
+let currentLat = null;
+let currentLng = null;
+
+function initLeafletMap(lat, lng) {
+
+    const map = L.map('map').setView([lat, lng], 16);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.marker([lat, lng]).addTo(map)
+        .bindPopup("Bạn đang ở đây")
+        .openPopup();
 }
 
-async function submitForm(){
-    const hoten = document.getElementById("hoten").value;
-    const taikhoan = document.getElementById("taikhoan").value;
-    const matkhau = document.getElementById("matkhau").value;
-    const msg = document.getElementById("message");
+function getLocation() {
 
-    if(!taikhoan || !matkhau){
-        msg.innerText="Nhập đầy đủ thông tin!";
-        msg.className="message error";
+    if (!navigator.geolocation) {
+        document.getElementById("locationText").innerHTML =
+            "Trình duyệt không hỗ trợ GPS.";
         return;
     }
 
-    const res = await fetch(API_URL);
-    const users = await res.json();
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
 
-    if(isLogin){
-        const user = users.find(u=>u.TaiKhoan===taikhoan && u.MatKhau===matkhau);
-        if(!user){
-            msg.innerText="Sai tài khoản hoặc mật khẩu!";
-            msg.className="message error";
-            return;
-        }
+            currentLat = position.coords.latitude;
+            currentLng = position.coords.longitude;
 
-       await openFacePopup();
+            initLeafletMap(currentLat, currentLng);
 
-        const descriptor = await detectFaceLoop();
+            document.getElementById("locationText").innerHTML =
+                "Lat: " + currentLat.toFixed(5) +
+                " | Lng: " + currentLng.toFixed(5);
+        },
+        function() {
+            document.getElementById("locationText").innerHTML =
+                "Không thể lấy vị trí.";
+        },
+        { enableHighAccuracy: true }
+    );
+}
 
-        closeFacePopup(); // luôn đóng
+getLocation();
 
-        if(!descriptor) return;
+// ========================
+// MOCK API
+// ========================
+
+const Id = Math.random();
+function tinhSoGio(gioVao, gioRa) {
+
+    if (!gioVao || !gioRa) return 0;
+
+    const [vaoH, vaoM] = gioVao.split(":").map(Number);
+    const [raH, raM] = gioRa.split(":").map(Number);
+
+    let tongPhut = (raH * 60 + raM) - (vaoH * 60 + vaoM);
+
+    // Nếu làm qua ngày (vd 22:00 -> 06:00)
+    if (tongPhut < 0) {
+        tongPhut += 24 * 60;
+    }
+
+    const gio = Math.floor(tongPhut / 60);
+    const phut = tongPhut % 60;
+
+    // Hiển thị UI
+    document.getElementById("tongGio").innerText =
+        `Tổng giờ: ${gio}h ${phut}p`;
+
+    return {
+        gio,
+        phut,
+        tongPhut
+    };
+}
 
 
-    }else{
-        if(!hoten){
-            msg.innerText="Nhập họ tên!";
-            msg.className="message error";
-            return;
-        }
+function getHomNay() {
+    const today = new Date();
+    today.setDate(today.getDate() + 2); // +1 ngày
+    return today.toISOString().split("T")[0];
+}
+async function chamCong() {
 
-        await openFacePopup();
-        setTimeout(async()=>{
-            const descriptor = await captureDescriptor();
-            closeFacePopup();
+    const homNay = getHomNay();
+    const gioHienTai = getGioHienTai();
 
-            if(!descriptor) return;
+    const now = new Date();
+    const nam = now.getFullYear();
+    const thang = String(now.getMonth() + 1).padStart(2, "0");
+    const thangNam = `${nam}-${thang}`;
+   
+    try {
 
-            const newUser={
-                HoTen:hoten,
-                TaiKhoan:taikhoan,
-                MatKhau:matkhau,
-                AnhDaiDien:"",
-                VectorKhuonMat:JSON.stringify(Array.from(descriptor))
-            };
+        // =========================
+        // 1️⃣ LẤY TOÀN BỘ DANH SÁCH
+        // =========================
 
-            await fetch(API_URL,{
-                method:"POST",
-                headers:{"Content-Type":"application/json"},
-                body:JSON.stringify(newUser)
+        let res = await fetch(BASE_URL);
+        let allData = await res.json();
+
+        // Tìm tháng hiện tại
+        let record = allData.find(x => x.Thang === thangNam);
+
+        // =========================
+        // 2️⃣ NẾU CHƯA CÓ THÁNG → TẠO MỚI
+        // =========================
+
+        if (!record) {
+
+            const createRes = await fetch(BASE_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    Thang: thangNam,
+                    GioVao_GioRa_Thang: []
+                })
             });
 
-            msg.innerText="Đăng ký thành công!";
-            msg.className="message success";
-        },2500);
+            record = await createRes.json();
+        }
+
+        let danhSachThang = Array.isArray(record.GioVao_GioRa_Thang)
+            ? record.GioVao_GioRa_Thang
+            : [];
+
+        // =========================
+        // 3️⃣ XỬ LÝ NGÀY
+        // =========================
+
+        let ngay = danhSachThang.find(x => x.idNgay === homNay);
+        
+        if (!ngay) {
+
+            // CHECK IN
+            danhSachThang.push({
+                idNgay: homNay,
+                GioVao: gioHienTai,
+                GioRa: null,
+                IsTangCa: false,
+                SoTieng_TrongNgay: 0
+            });
+
+            document.getElementById("gioVao").innerText = gioHienTai;
+
+        }
+        else if (!ngay.GioRa) {
+            const soGio  = getHomNay(ngay.GioVao ?? null ,ngay.GioRa ?? null);
+            // CHECK OUT
+            ngay.GioRa = gioHienTai;
+            ngay.SoTieng_TrongNgay = Number(soGio);
+            ngay.IsTangCa = soGio > 8;
+            ngay.SoTieng_TrongNgay = tinhSoGio(ngay.GioVao,ngay.GioRa);
+        }
+        else
+        {
+            const soGio  = getHomNay(ngay.GioVao ?? null ,ngay.GioRa ?? null);
+              // CHECK OUT
+            ngay.GioRa = gioHienTai;
+            ngay.SoTieng_TrongNgay = Number(soGio);
+            ngay.IsTangCa = soGio > 8;
+            ngay.SoTieng_TrongNgay = tinhSoGio(ngay.GioVao,ngay.GioRa);
+        }
+        // =========================
+        // 4️⃣ UPDATE LẠI THEO ID THẬT
+        // =========================
+
+        await fetch(`${BASE_URL}/${record.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                ...record,
+                GioVao_GioRa_Thang: danhSachThang
+            })
+        });
+
+        alert("Lưu thành công ✅");
+        loadChamCong();
+
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi hệ thống ❌");
     }
 }
 
-async function loginFace(){
-    const msg = document.getElementById("message");
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    const users = data.results;
+function getThangNamHienTai() {
+    const now = new Date();
+    const nam = now.getFullYear();
+    const thang = String(now.getMonth() + 1).padStart(2, "0");
+    return `${nam}-${thang}`;
+}
+async function loadChamCong() {
 
+    const thangNam = getThangNamHienTai();
+    const homNay = getHomNay();
 
-    await openFacePopup();
+    try {
 
-    setTimeout(async()=>{
-        const descriptor = await captureDescriptor();
-        closeFacePopup();
+        const res = await fetch(BASE_URL);
+        const data = await res.json();
 
-        if(!descriptor) return;
+        const record = data.find(x => x.Thang === thangNam);
 
-        for(let user of users){
-            try{
-                const saved = new Float32Array(JSON.parse(user.VectorKhuonMat));
-                const distance = faceapi.euclideanDistance(descriptor,saved);
-                if(distance<0.5){
-                    msg.innerText="Xin chào "+user.HoTen;
-                    msg.className="message success";
-                    setTimeout(()=>window.location.href="home.html",1500);
-                    return;
-                }
-            }catch{}
+        if (!record) return;
+
+        const ngay = record.GioVao_GioRa_Thang
+            ?.find(x => x.idNgay === homNay);
+
+        // Hiển thị ngày hôm nay
+        document.getElementById("today").innerText = homNay;
+
+        if (!ngay) {
+            // Chưa chấm công
+            document.getElementById("gioVao").innerText = "--:--";
+            document.getElementById("gioRa").innerText = "--:--";
+            document.getElementById("tongGio").innerText = "Tổng giờ: 0h";
+
+            setStatus(false);
+            return;
         }
 
-        msg.innerText="Không nhận diện được!";
-        msg.className="message error";
-    },2500);
-}
-</script>
+        // Có dữ liệu
+        document.getElementById("gioVao").innerText =
+            ngay.GioVao ?? "--:--";
 
+        document.getElementById("gioRa").innerText =
+            ngay.GioRa ?? "--:--";
+
+        document.getElementById("tongGio").innerText =
+            "Tổng giờ: " + (ngay.SoTieng_TrongNgay.gio ?? 0) + " giờ " + (ngay.SoTieng_TrongNgay.phut ?? 0) + " phút ";
+
+        // Nếu đã có giờ ra => đã chấm công
+        setStatus(!!ngay.GioRa);
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+function setStatus(isDone) {
+
+    const statusDiv = document.querySelector(".status");
+
+    if (isDone) {
+        statusDiv.classList.remove("red");
+        statusDiv.classList.add("green");
+        statusDiv.innerHTML = "● Đã chấm công";
+    } else {
+        statusDiv.classList.remove("green");
+        statusDiv.classList.add("red");
+        statusDiv.innerHTML = "● Chưa chấm công";
+    }
+}
+
+</script>
+<script src="./appsetting.js"></script>
 </body>
 </html>
